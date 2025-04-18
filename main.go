@@ -3,20 +3,20 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v2"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
-	"github.com/prometheus/common/version"
+	commons "github.com/prometheus/common/version"
 )
 
 type Config struct {
@@ -46,16 +46,16 @@ var Probers = map[string]func(string, http.ResponseWriter, Module) bool{
 }
 
 func (sc *SafeConfig) reloadConfig(confFile string) (err error) {
-	var c = &Config{}
+	c := &Config{}
 
-	yamlFile, err := ioutil.ReadFile(confFile)
+	yamlFile, err := os.ReadFile(confFile)
 	if err != nil {
-		log.Errorf("Error reading config file: %s", err)
+		slog.Error(fmt.Sprintf("Error reading config file: %s", err))
 		return err
 	}
 
 	if err := yaml.Unmarshal(yamlFile, c); err != nil {
-		log.Errorf("Error parsing config file: %s", err)
+		slog.Error(fmt.Sprintf("Error parsing config file: %s", err))
 		return err
 	}
 
@@ -63,7 +63,7 @@ func (sc *SafeConfig) reloadConfig(confFile string) (err error) {
 	sc.C = c
 	sc.Unlock()
 
-	log.Infoln("Loaded config file")
+	slog.Info("Loaded config file")
 	return nil
 }
 
@@ -116,15 +116,15 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Fprintln(os.Stdout, version.Print("sentry_exporter"))
+		fmt.Fprintln(os.Stdout, commons.Print("sentry_exporter"))
 		os.Exit(0)
 	}
 
-	log.Infoln("Starting sentry_exporter", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	slog.Info("Starting sentry_exporter", commons.Info())
+	slog.Info("Build context", commons.BuildContext())
 
 	if err := sc.reloadConfig(*configFile); err != nil {
-		log.Fatalf("Error loading config: %s", err)
+		slog.Error(fmt.Sprintf("Error loading config: %s", err))
 	}
 
 	hup := make(chan os.Signal)
@@ -135,11 +135,11 @@ func main() {
 			select {
 			case <-hup:
 				if err := sc.reloadConfig(*configFile); err != nil {
-					log.Errorf("Error reloading config: %s", err)
+					slog.Error(fmt.Sprintf("Error reloading config: %s", err))
 				}
 			case rc := <-reloadCh:
 				if err := sc.reloadConfig(*configFile); err != nil {
-					log.Errorf("Error reloading config: %s", err)
+					slog.Error(fmt.Sprintf("Error reloading config: %s", err))
 					rc <- err
 				} else {
 					rc <- nil
@@ -182,8 +182,8 @@ func main() {
             </html>`))
 	})
 
-	log.Infoln("Listening on", *listenAddress)
+	slog.Info("Listening on", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
-		log.Fatalf("Error starting HTTP server: %s", err)
+		slog.Error(fmt.Sprintf("Error starting HTTP server: %s", err))
 	}
 }
