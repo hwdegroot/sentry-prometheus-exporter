@@ -8,13 +8,14 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
-func extractErrorRate(reader io.Reader, config HTTPProbe) int {
+func extractErrorRate(reader io.Reader) int {
 	re := regexp.MustCompile(`(\d+)]]$`)
 	body, err := io.ReadAll(reader)
 	if err != nil {
@@ -48,6 +49,7 @@ func probeHTTP(target string, w http.ResponseWriter, module Module) (success boo
 		slog.Error(fmt.Sprintf("Error creating request URL for target %s: %s", target, err))
 	}
 
+	slog.Info(fmt.Sprintf("Request URL: %s", requestURL))
 	request, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Error creating request for target %s: %s", target, err))
@@ -75,17 +77,17 @@ func probeHTTP(target string, w http.ResponseWriter, module Module) (success boo
 	} else {
 		defer resp.Body.Close()
 		if len(config.ValidStatusCodes) != 0 {
-			for _, code := range config.ValidStatusCodes {
-				if resp.StatusCode == code {
-					success = true
-					break
-				}
+			if slices.Contains(config.ValidStatusCodes, resp.StatusCode) {
+				success = true
+			}
+			if slices.Contains(config.ValidStatusCodes, resp.StatusCode) {
+				success = true
 			}
 		} else if 200 <= resp.StatusCode && resp.StatusCode < 300 {
 			success = true
 		}
 		if success {
-			fmt.Fprintf(w, "probe_sentry_error_received %d\n", extractErrorRate(resp.Body, config))
+			fmt.Fprintf(w, "probe_sentry_error_received %d\n", extractErrorRate(resp.Body))
 		}
 	}
 	if resp == nil {

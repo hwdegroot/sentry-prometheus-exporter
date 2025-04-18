@@ -1,15 +1,14 @@
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates gcompat
 
 WORKDIR /app/
 
 # https://stackoverflow.com/a/35613430
-RUN mkdir -p /etc/sentry_exporter/ && mkdir /lib64 && \
-    ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
+RUN mkdir -p /etc/sentry-prometheus-exporter/
 
-COPY ./sentry_exporter .
-COPY sentry_exporter.yml /etc/sentry_exporter/config.yml
+COPY bin/sentry-prometheus-exporter /
+COPY config/sentry-prometheus-exporter.yml /etc/sentry-prometheus-exporter/config.yml
 
 EXPOSE 9412
-ENTRYPOINT ["./sentry_exporter"]
-CMD ["--config.file=/etc/sentry_exporter/config.yml"]
+ENTRYPOINT ["/sentry-prometheus-exporter"]
+CMD ["--config.file=/etc/sentry-prometheus-exporter/config.yml"]

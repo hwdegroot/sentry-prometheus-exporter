@@ -19,6 +19,8 @@ import (
 	commons "github.com/prometheus/common/version"
 )
 
+const moduleName = "sentry-prometheus-exporter"
+
 type Config struct {
 	Modules map[string]Module `yaml:"modules"`
 }
@@ -101,12 +103,12 @@ func probeHandler(w http.ResponseWriter, r *http.Request, conf *Config) {
 }
 
 func init() {
-	prometheus.MustRegister(version.NewCollector("sentry_exporter"))
+	prometheus.MustRegister(version.NewCollector(moduleName))
 }
 
 func main() {
 	var (
-		configFile    = flag.String("config.file", "sentry_exporter.yml", "Sentry exporter configuration file.")
+		configFile    = flag.String("config.file", "config/sentry-prometheus-exporter.yml", "Sentry exporter configuration file.")
 		listenAddress = flag.String("web.listen-address", ":9412", "The address to listen on for HTTP requests.")
 		showVersion   = flag.Bool("version", false, "Print version information.")
 		sc            = &SafeConfig{
@@ -116,12 +118,15 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Fprintln(os.Stdout, commons.Print("sentry_exporter"))
+		fmt.Fprintln(os.Stdout, commons.Print(moduleName))
 		os.Exit(0)
 	}
 
-	slog.Info("Starting sentry_exporter", commons.Info())
-	slog.Info("Build context", commons.BuildContext())
+	slog.Info(
+    fmt.Sprintf("Starting %s", moduleName),
+    "info", commons.Info(),
+  )
+	slog.Info("Build context", "context", commons.BuildContext())
 
 	if err := sc.reloadConfig(*configFile); err != nil {
 		slog.Error(fmt.Sprintf("Error loading config: %s", err))
@@ -182,7 +187,7 @@ func main() {
             </html>`))
 	})
 
-	slog.Info("Listening on", *listenAddress)
+	slog.Info("Listening on", "port", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
 		slog.Error(fmt.Sprintf("Error starting HTTP server: %s", err))
 	}
